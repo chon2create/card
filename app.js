@@ -210,22 +210,28 @@ function adminLogin() {
     preConfirm: () => {
       const u = document.getElementById('swal-user').value;
       const p = document.getElementById('swal-pass').value;
-      if (u === 'admin' && p === '1234') {
-        isAdmin = true;
-        return true;
-      }
+      if (u === 'admin' && p === '1234') { isAdmin = true; return true; }
       Swal.showValidationMessage('ข้อมูลเข้าสู่ระบบไม่ถูกต้อง');
       return false;
     }
   }).then(r => {
     if (r.isConfirmed) {
-      // โหมดผู้ดูแล: แสดงเฉพาะตาราง
       document.getElementById('formSection').style.display = 'none';
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      document.getElementById('adminBtn').classList.add('hidden');
       document.getElementById('tableSection').scrollIntoView({ behavior: 'smooth' });
       refreshTable();
       Swal.fire({ icon:'success', title:'โหมดผู้ดูแล', text:'แสดงเฉพาะตารางรายการคำขอ' });
     }
   });
+}
+
+function adminLogout() {
+  isAdmin = false;
+  document.getElementById('formSection').style.display = '';
+  document.getElementById('logoutBtn').classList.add('hidden');
+  document.getElementById('adminBtn').classList.remove('hidden');
+  refreshTable();
 }
 
 async function fetchList() {
@@ -346,5 +352,6 @@ window.addEventListener('DOMContentLoaded', () => {
   bindCaseUI();
   document.getElementById('requestForm').addEventListener('submit', submitForm);
   document.getElementById('adminBtn').addEventListener('click', adminLogin);
+  document.getElementById('logoutBtn').addEventListener('click', adminLogout);
   refreshTable();
 });
