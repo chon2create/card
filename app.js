@@ -216,6 +216,7 @@ function adminLogin() {
     }
   }).then(r => {
     if (r.isConfirmed) {
+      localStorage.setItem('isAdmin', '1');
       document.getElementById('formSection').style.display = 'none';
       document.getElementById('logoutBtn').classList.remove('hidden');
       document.getElementById('adminBtn').classList.add('hidden');
@@ -228,6 +229,7 @@ function adminLogin() {
 
 function adminLogout() {
   isAdmin = false;
+  localStorage.removeItem('isAdmin');
   document.getElementById('formSection').style.display = '';
   document.getElementById('logoutBtn').classList.add('hidden');
   document.getElementById('adminBtn').classList.remove('hidden');
@@ -353,5 +355,14 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('requestForm').addEventListener('submit', submitForm);
   document.getElementById('adminBtn').addEventListener('click', adminLogin);
   document.getElementById('logoutBtn').addEventListener('click', adminLogout);
+
+  // Restore admin state if previously logged in
+  if (localStorage.getItem('isAdmin') === '1') {
+    isAdmin = true;
+    document.getElementById('formSection').style.display = 'none';
+    document.getElementById('logoutBtn').classList.remove('hidden');
+    document.getElementById('adminBtn').classList.add('hidden');
+  }
+
   refreshTable();
 });
