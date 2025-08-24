@@ -245,13 +245,13 @@ function buildDocsButton(row) {
   return `<button class="view-docs px-2 py-1 bg-gray-100 rounded border" data-imgs='${JSON.stringify(imgs)}' data-other='${other || ''}'>ดูเอกสาร</button>`;
 }
 
-async function markVerified(recordId) {
+async function updateStatus(recordId, status) {
   try {
     showOverlay(true);
     const params = new URLSearchParams();
     params.append('action', 'updateStatus');
     params.append('recordId', recordId);
-    params.append('status', 'ตรวจสอบแล้ว');
+    params.append('status', status);
     params.append('adminUser', 'admin');
     params.append('adminPass', '1234');
     const res = await fetch(SCRIPT_URL, {
@@ -261,7 +261,6 @@ async function markVerified(recordId) {
     });
     const data = await res.json();
     if (data?.success) {
-      Swal.fire({ icon: 'success', title: 'อัปเดตสถานะเรียบร้อย' });
       refreshTable();
     } else {
       throw new Error(data?.message || 'อัปเดตไม่สำเร็จ');
@@ -286,14 +285,22 @@ async function refreshTable() {
       { title: 'เจ้าหน้าที่ของรัฐประเภท', data: 'officerType' },
       { title: 'กรณี', data: 'caseSummary' },
       { title: 'เอกสาร', data: null, render: (d, t, row) => buildDocsButton(row) },
-      { title: 'สถานะ', data: 'status', render: (d) => renderStatusBadge(d) },
-      { title: 'จัดการ', data: null, render: (d, t, row) => {
-          if (!isAdmin) return '-';
-          if (row.status === 'ตรวจสอบแล้ว') return '<span class="text-green-700">✓</span>';
-          return `<button class="verify-btn px-2 py-1 bg-fb-primary text-white rounded" data-id="${row.recordId}">ตรวจสอบแล้ว</button>`;
-        }
-      }
+      { title: 'สถานะ', data: 'status', render: (d) => renderStatusBadge(d) }
     ];
+
+    if (isAdmin) {
+      columns.push({
+        title: 'เปลี่ยนสถานะ', data: null, render: (d, t, row) => {
+          const current = row.status === 'ตรวจสอบแล้ว' ? 'ตรวจสอบแล้ว' : 'อยู่ระหว่างตรวจสอบ';
+          return `
+            <select class="status-select border rounded px-2 py-1" data-id="${row.recordId}">
+              <option value="อยู่ระหว่างตรวจสอบ" ${current==='อยู่ระหว่างตรวจสอบ'?'selected':''}>อยู่ระหว่างตรวจสอบ</option>
+              <option value="ตรวจสอบแล้ว" ${current==='ตรวจสอบแล้ว'?'selected':''}>ตรวจสอบแล้ว</option>
+            </select>
+          `;
+        }
+      });
+    }
 
     if (dataTableInstance) {
       dataTableInstance.clear();
@@ -322,9 +329,10 @@ async function refreshTable() {
         Swal.fire({ title: 'เอกสารที่แนบ', html, width: 700 });
       });
 
-      $('#submissionsTable').on('click', '.verify-btn', function() {
+      $('#submissionsTable').on('change', '.status-select', function() {
         const id = this.getAttribute('data-id');
-        markVerified(id);
+        const val = this.value;
+        updateStatus(id, val);
       });
     }
   } catch (e) {
