@@ -219,8 +219,11 @@ function adminLogin() {
     }
   }).then(r => {
     if (r.isConfirmed) {
-      Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับผู้ดูแลระบบ' });
+      // โหมดผู้ดูแล: แสดงเฉพาะตาราง
+      document.getElementById('formSection').style.display = 'none';
+      document.getElementById('tableSection').scrollIntoView({ behavior: 'smooth' });
       refreshTable();
+      Swal.fire({ icon:'success', title:'โหมดผู้ดูแล', text:'แสดงเฉพาะตารางรายการคำขอ' });
     }
   });
 }
@@ -240,9 +243,7 @@ function renderStatusBadge(status) {
 }
 
 function buildDocsButton(row) {
-  const imgs = [row.photo1Url, row.photo2Url].filter(Boolean);
-  const other = row.otherUrl;
-  return `<button class="view-docs px-2 py-1 bg-gray-100 rounded border" data-imgs='${JSON.stringify(imgs)}' data-other='${other || ''}'>ดูเอกสาร</button>`;
+  return `<button class="review-btn px-3 py-1 bg-fb-primary text-white rounded" data-row='${JSON.stringify(row)}'>ตรวจสอบ</button>`;
 }
 
 async function updateStatus(recordId, status) {
@@ -284,23 +285,9 @@ async function refreshTable() {
       { title: 'ชื่อ-สกุล ผู้ยื่นคำขอ', data: 'fullName' },
       { title: 'เจ้าหน้าที่ของรัฐประเภท', data: 'officerType' },
       { title: 'กรณี', data: 'caseSummary' },
-      { title: 'เอกสาร', data: null, render: (d, t, row) => buildDocsButton(row) },
+      { title: 'ตรวจสอบ', data: null, render: (d, t, row) => buildDocsButton(row) },
       { title: 'สถานะ', data: 'status', render: (d) => renderStatusBadge(d) }
     ];
-
-    if (isAdmin) {
-      columns.push({
-        title: 'เปลี่ยนสถานะ', data: null, render: (d, t, row) => {
-          const current = row.status === 'ตรวจสอบแล้ว' ? 'ตรวจสอบแล้ว' : 'อยู่ระหว่างตรวจสอบ';
-          return `
-            <select class="status-select border rounded px-2 py-1" data-id="${row.recordId}">
-              <option value="อยู่ระหว่างตรวจสอบ" ${current==='อยู่ระหว่างตรวจสอบ'?'selected':''}>อยู่ระหว่างตรวจสอบ</option>
-              <option value="ตรวจสอบแล้ว" ${current==='ตรวจสอบแล้ว'?'selected':''}>ตรวจสอบแล้ว</option>
-            </select>
-          `;
-        }
-      });
-    }
 
     if (dataTableInstance) {
       dataTableInstance.clear();
@@ -316,23 +303,35 @@ async function refreshTable() {
         language: { url: 'https://cdn.datatables.net/plug-ins/2.0.7/i18n/th.json' }
       });
 
-      $('#submissionsTable').on('click', '.view-docs', function() {
-        const imgs = JSON.parse(this.getAttribute('data-imgs') || '[]');
-        const other = this.getAttribute('data-other');
+      $('#submissionsTable').on('click', '.review-btn', function() {
+        const row = JSON.parse(this.getAttribute('data-row'));
         let html = '';
+        const detailPairs = [
+          ['เลขคำขอ', row.recordId],
+          ['ชื่อ-สกุล', row.fullName],
+          ['ประเภทเจ้าหน้าที่', row.officerType],
+          ['กรณี', row.caseSummary],
+          ['สถานะ', row.status]
+        ];
+        html += '<div class="text-left space-y-1 mb-3">';
+        detailPairs.forEach(([k,v]) => html += `<div><b>${k}</b>: ${v || '-'}</div>`);
+        html += '</div>';
+        const imgs = [row.photo1Url, row.photo2Url].filter(Boolean);
         if (imgs.length) {
           html += imgs.map(u => `<img src="${u}" style="max-width:100%;margin-bottom:8px;border-radius:8px;">`).join('');
         }
-        if (other) {
-          html += `<p><a href="${other}" target="_blank" class="text-blue-600 underline">เอกสารอื่น ๆ</a></p>`;
+        if (row.otherUrl) {
+          html += `<p class="mt-2"><a href="${row.otherUrl}" target="_blank" class="text-blue-600 underline">เอกสารอื่น ๆ</a></p>`;
         }
-        Swal.fire({ title: 'เอกสารที่แนบ', html, width: 700 });
-      });
-
-      $('#submissionsTable').on('change', '.status-select', function() {
-        const id = this.getAttribute('data-id');
-        const val = this.value;
-        updateStatus(id, val);
+        Swal.fire({
+          title: 'ตรวจสอบคำขอ',
+          html,
+          width: 800,
+          showCancelButton: true,
+          confirmButtonText: 'ตรวจสอบแล้ว',
+          cancelButtonText: 'ปิด',
+          preConfirm: async () => { await updateStatus(row.recordId, 'ตรวจสอบแล้ว'); }
+        });
       });
     }
   } catch (e) {
