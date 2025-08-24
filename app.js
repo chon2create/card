@@ -27,6 +27,17 @@ function getCheckedValues(name) {
   return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(i => i.value);
 }
 
+function calcAgeFromDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age < 0 ? '' : age;
+}
+
 function validateForm(form) {
   const fullName = form.fullName.value.trim();
   const officerType = form.officerType.value;
@@ -39,7 +50,14 @@ function validateForm(form) {
   if (!p1 || !p2) return 'กรุณาแนบรูปถ่ายให้ครบ 2 รูป';
   if (caseType === 'ขอมีบัตรครั้งแรก' && !document.querySelector('input[name="case1Reason"]:checked')) return 'กรุณาเลือกเหตุผลในกรณีที่ 1';
   if (caseType === 'ขอมีบัตรใหม่' && !document.querySelector('input[name="case2Reason"]:checked')) return 'กรุณาเลือกเหตุผลในกรณีที่ 2';
-  if (caseType === 'ขอเปลี่ยนบัตร' && getCheckedValues('case3Reasons').length === 0) return 'กรุณาเลือกเหตุผลในกรณีที่ 3';
+  if (caseType === 'ขอเปลี่ยนบัตร') {
+    const reasons = getCheckedValues('case3Reasons');
+    if (reasons.length === 0) return 'กรุณาเลือกเหตุผลในกรณีที่ 3';
+    if (reasons.includes('อื่นๆ')) {
+      const t = (form.case3OtherText.value || '').trim();
+      if (!t) return 'โปรดระบุเหตุผลอื่น ๆ เพิ่มเติม';
+    }
+  }
   return null;
 }
 
@@ -56,7 +74,7 @@ function buildCaseSummary(form) {
   }
   if (caseType === 'ขอเปลี่ยนบัตร') {
     const reasons = getCheckedValues('case3Reasons');
-    const otherText = form.case3OtherText.value?.trim();
+    const otherText = (form.case3OtherText.value || '').trim();
     const list = reasons.join(', ');
     const listWithOther = reasons.includes('อื่นๆ') && otherText ? `${list} (${otherText})` : list;
     const oldNo = form.oldCardNumber3.value || '';
@@ -162,6 +180,14 @@ async function submitForm(e) {
 
 function bindCaseUI() {
   const form = document.getElementById('requestForm');
+  // default today date
+  const today = new Date();
+  form.requestDate.value = today.toISOString().slice(0,10);
+  // age auto-calc
+  form.birthDate.addEventListener('change', () => {
+    form.age.value = calcAgeFromDate(form.birthDate.value);
+  });
+
   form.addEventListener('change', (e) => {
     if (e.target.name === 'caseType') {
       const val = e.target.value;
@@ -278,8 +304,9 @@ async function refreshTable() {
         data: items,
         columns,
         pageLength: 10,
-        order: [[0, 'asc']],
-        responsive: true
+        order: [[0, 'desc']],
+        responsive: true,
+        language: { url: 'https://cdn.datatables.net/plug-ins/2.0.7/i18n/th.json' }
       });
 
       $('#submissionsTable').on('click', '.view-docs', function() {
