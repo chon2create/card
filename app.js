@@ -43,11 +43,10 @@ function validateForm(form) {
   const officerType = form.officerType.value;
   const caseType = form.caseType.value;
   const p1 = document.getElementById('photo1').files[0];
-  const p2 = document.getElementById('photo2').files[0];
   if (!fullName) return 'กรุณากรอกชื่อ-สกุล';
   if (!officerType) return 'กรุณาเลือกประเภทเจ้าหน้าที่ของรัฐ';
   if (!caseType) return 'กรุณาเลือกกรณี';
-  if (!p1 || !p2) return 'กรุณาแนบรูปถ่ายให้ครบ 2 รูป';
+  if (!p1) return 'กรุณาแนบรูปถ่าย 1 รูป';
   if (caseType === 'ขอมีบัตรครั้งแรก' && !document.querySelector('input[name="case1Reason"]:checked')) return 'กรุณาเลือกเหตุผลในกรณีที่ 1';
   if (caseType === 'ขอมีบัตรใหม่' && !document.querySelector('input[name="case2Reason"]:checked')) return 'กรุณาเลือกเหตุผลในกรณีที่ 2';
   if (caseType === 'ขอเปลี่ยนบัตร') {
@@ -98,11 +97,10 @@ async function submitForm(e) {
 
   try {
     const photo1 = document.getElementById('photo1').files[0];
-    const photo2 = document.getElementById('photo2').files[0];
     const otherDoc = document.getElementById('otherDoc').files[0];
 
-    const [p1b, p2b, odb] = await Promise.all([
-      fileToBase64(photo1), fileToBase64(photo2), fileToBase64(otherDoc)
+    const [p1b, odb] = await Promise.all([
+      fileToBase64(photo1), fileToBase64(otherDoc)
     ]);
 
     const caseSummary = buildCaseSummary(form);
@@ -138,11 +136,6 @@ async function submitForm(e) {
       params.append('photo1_data', p1b.base64);
       params.append('photo1_name', p1b.name);
       params.append('photo1_type', p1b.type);
-    }
-    if (p2b) {
-      params.append('photo2_data', p2b.base64);
-      params.append('photo2_name', p2b.name);
-      params.append('photo2_type', p2b.type);
     }
     if (odb && odb.base64) {
       params.append('other_data', odb.base64);
@@ -326,10 +319,6 @@ async function refreshTable() {
         html += '</div>';
         const imgs = [];
         if (row.photo1Url) imgs.push(row.photo1Url);
-        // Exclude photo2 for the specific request as requested
-        if (row.photo2Url && row.recordId !== 'bc-6eecad62-8c49-4a9b-9256-3ad8a40ec655') {
-          imgs.push(row.photo2Url);
-        }
         if (imgs.length) {
           html += imgs.map(u => `<img src="${u}" style="max-width:100%;margin-bottom:8px;border-radius:8px;">`).join('');
         }
