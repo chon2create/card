@@ -324,12 +324,7 @@ async function refreshTable() {
         html += '<div class="text-left space-y-1 mb-3">';
         detailPairs.forEach(([k,v]) => html += `<div><b>${k}</b>: ${v || '-'}</div>`);
         html += '</div>';
-        const imgs = [];
-        if (row.photo1Url) imgs.push(row.photo1Url);
-        // Exclude photo2 for the specific request as requested
-        if (row.photo2Url && row.recordId !== 'bc-6eecad62-8c49-4a9b-9256-3ad8a40ec655') {
-          imgs.push(row.photo2Url);
-        }
+        const imgs = [row.photo1Url, row.photo2Url].filter(Boolean);
         if (imgs.length) {
           html += imgs.map(u => `<img src="${u}" style="max-width:100%;margin-bottom:8px;border-radius:8px;">`).join('');
         }
