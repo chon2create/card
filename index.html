@@ -1,672 +1,233 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
-        body { font-family: 'Sarabun', sans-serif; }
-        .swal2-popup { font-family: 'Sarabun', sans-serif; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+          colors: {
+            fb: {
+              bg: '#f0f2f5',
+              primary: '#1877f2',
+              primaryDark: '#166fe5'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css" rel="stylesheet"/>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"></script>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; }
+    .card { background: white; border-radius: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .badge { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .status-pending { background: #fef08a; color: #854d0e; }
+    .status-done { background: #bbf7d0; color: #166534; }
+    .overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 60; }
+    .spinner { width: 3rem; height: 3rem; border: 4px solid #93c5fd; border-top-color: #1877f2; border-radius: 9999px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
-<body class="bg-gray-100">
-    <header class="bg-blue-600 text-white p-4 flex items-center justify-center">
-        <img src="https://lh3.googleusercontent.com/d/1reqwwQP7acieFotjwOkM4qYIg9w1A3rf" alt="โลโก้" class="h-12 mr-4 bg-transparent">
-        <div class="text-center">
-            <h1 class="text-lg font-bold">ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</h1>
-            <h2 class="text-md font-medium">สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2</h2>
-        </div>
-    </header>
-    <nav class="bg-blue-500 text-white p-2">
-        <button id="admin-menu" class="bg-blue-700 px-4 py-2 rounded text-white hover:bg-blue-800">สำหรับผู้ดูแลระบบ</button>
-        <span id="logout-span" class="hidden ml-4">
-            <button id="logout-btn" class="bg-red-500 px-4 py-2 rounded text-white hover:bg-red-600">ออกจากระบบ</button>
-        </span>
-    </nav>
-    <main class="container mx-auto p-4">
-        <form id="request-form" class="bg-white p-6 rounded shadow-md">
-            <h2 class="text-xl font-bold mb-4">ข้อมูลส่วนบุคคล</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="prefix" class="block">คำนำหน้า *</label>
-                    <select id="prefix" class="border p-2 w-full" required>
-                        <option value="">เลือก</option>
-                        <option value="นาย">นาย</option>
-                        <option value="นาง">นาง</option>
-                        <option value="นางสาว">นางสาว</option>
-                        <option value="อื่นๆ">อื่นๆ</option>
-                    </select>
-                    <div id="prefix-other-div" class="hidden mt-2">
-                        <label for="prefix-other" class="block">ระบุคำนำหน้าอื่นๆ *</label>
-                        <input id="prefix-other" type="text" class="border p-2 w-full">
-                    </div>
-                </div>
-                <div>
-                    <label for="firstname" class="block">ชื่อ *</label>
-                    <input id="firstname" type="text" class="border p-2 w-full" required>
-                </div>
-                <div>
-                    <label for="lastname" class="block">นามสกุล *</label>
-                    <input id="lastname" type="text" class="border p-2 w-full" required>
-                </div>
-                <div>
-                    <label for="idcard" class="block">เลขประจำตัวประชาชน *</label>
-                    <input id="idcard" type="text" class="border p-2 w-full" required pattern="\d{13}" title="13 หลักตัวเลข">
-                </div>
-                <div>
-                    <label for="nationality" class="block">สัญชาติ *</label>
-                    <input id="nationality" type="text" class="border p-2 w-full" required>
-                </div>
-                <div>
-                    <label for="birthdate" class="block">วันเดือนปีเกิด *</label>
-                    <input id="birthdate" type="date" class="border p-2 w-full" required>
-                    <small class="text-gray-500">กรุณาป้อนวันที่ในรูปแบบ ค.ศ. (ระบบจะแปลงเป็น พ.ศ. อัตโนมัติ)</small>
-                </div>
-                <div>
-                    <label for="age" class="block">อายุ</label>
-                    <input id="age" type="text" class="border p-2 w-full bg-gray-100" readonly>
-                </div>
-                <div>
-                    <label for="bloodgroup" class="block">หมู่โลหิต *</label>
-                    <select id="bloodgroup" class="border p-2 w-full" required>
-                        <option value="">เลือก</option>
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="AB">AB</option>
-                        <option value="O">O</option>
-                    </select>
-                </div>
-            </div>
-            <h2 class="text-xl font-bold mt-6 mb-4">ที่อยู่</h2>
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="homeaddress" class="block">ที่อยู่ตามทะเบียนบ้าน *</label>
-                    <textarea id="homeaddress" class="border p-2 w-full" required></textarea>
-                </div>
-                <div>
-                    <label for="homezipcode" class="block">รหัสไปรษณีย์ (ตามทะเบียนบ้าน) *</label>
-                    <input id="homezipcode" type="text" class="border p-2 w-full" required pattern="\d{5}" title="5 หลักตัวเลข">
-                </div>
-                <div>
-                    <label class="block">ที่อยู่ปัจจุบันที่สามารถติดต่อได้ *</label>
-                    <label class="flex items-center">
-                        <input type="checkbox" id="same-as-home" class="mr-2">
-                        เหมือนที่อยู่ตามทะเบียนบ้าน
-                    </label>
-                    <textarea id="currentaddress" class="border p-2 w-full mt-2" required></textarea>
-                </div>
-                <div>
-                    <label for="currentzipcode" class="block">รหัสไปรษณีย์ (ที่อยู่ปัจจุบัน) *</label>
-                    <input id="currentzipcode" type="text" class="border p-2 w-full" required pattern="\d{5}" title="5 หลักตัวเลข">
-                </div>
-            </div>
-            <h2 class="text-xl font-bold mt-6 mb-4">ข้อมูลการติดต่อ</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="phone" class="block">เบอร์โทรศัพท์ *</label>
-                    <input id="phone" type="text" class="border p-2 w-full" required pattern="\d{9,10}" title="9-10 หลักตัวเลข">
-                </div>
-                <div>
-                    <label for="email" class="block">อีเมล (ถ้ามี)</label>
-                    <input id="email" type="email" class="border p-2 w-full">
-                </div>
-            </div>
-            <h2 class="text-xl font-bold mt-6 mb-4">ข้อมูลการทำงาน</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="officertype" class="block">เจ้าหน้าที่ของรัฐประเภท *</label>
-                    <select id="officertype" class="border p-2 w-full" required>
-                        <option value="">เลือก</option>
-                        <option value="ข้าราชการครูและบุคลากรทางการศึกษา">ข้าราชการครูและบุคลากรทางการศึกษา</option>
-                        <option value="ลูกจ้างประจำ">ลูกจ้างประจำ</option>
-                        <option value="พนักงานราชการ">พนักงานราชการ</option>
-                        <option value="ข้าราชการบำนาญ">ข้าราชการบำนาญ</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="groupschool" class="block">กลุ่มงาน/โรงเรียน *</label>
-                    <input id="groupschool" type="text" class="border p-2 w-full" required>
-                </div>
-                <div>
-                    <label for="position" class="block">ตำแหน่ง *</label>
-                    <input id="position" type="text" class="border p-2 w-full" required>
-                </div>
-            </div>
-            <h2 class="text-xl font-bold mt-6 mb-4">กรณี *</h2>
-            <select id="case-select" class="border p-2 w-full mb-4" required>
-                <option value="">เลือกกรณี</option>
-                <option value="1">กรณีที่ 1 - ขอมีบัตรครั้งแรก</option>
-                <option value="2">กรณีที่ 2 - ขอมีบัตรใหม่</option>
-                <option value="3">กรณีที่ 3 - ขอเปลี่ยนบัตร</option>
-            </select>
-            <div id="case1" class="case-div hidden bg-blue-100 p-4 rounded mb-4">
-                <h3 class="font-bold">เลือกประเภท</h3>
-                <label><input type="radio" name="case1" value="บรรจุใหม่"> บรรจุใหม่</label><br>
-                <label><input type="radio" name="case1" value="บัตรข้าราชการบำนาญ"> บัตรข้าราชการบำนาญ</label>
-            </div>
-            <div id="case2" class="case-div hidden bg-yellow-100 p-4 rounded mb-4">
-                <h3 class="font-bold">เลือกเหตุผล</h3>
-                <label><input type="radio" name="case2" value="บัตรหมดอายุ"> บัตรหมดอายุ</label><br>
-                <label><input type="radio" name="case2" value="บัตรหายหรือถูกทำลาย"> บัตรหายหรือถูกทำลาย</label><br>
-                <label for="case2-oldnum" class="block mt-2">หมายเลขบัตรเดิม (ถ้าทราบ)</label>
-                <input id="case2-oldnum" type="text" class="border p-2 w-full">
-            </div>
-            <div id="case3" class="case-div hidden bg-green-100 p-4 rounded mb-4">
-                <h3 class="font-bold">เลือกเหตุผล (เลือกได้หลายข้อ)</h3>
-                <label><input type="checkbox" name="case3" value="เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน"> เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน</label><br>
-                <label><input type="checkbox" name="case3" value="เปลี่ยนชื่อตัว"> เปลี่ยนชื่อตัว</label><br>
-                <label><input type="checkbox" name="case3" value="เปลี่ยนชื่อสกุล"> เปลี่ยนชื่อสกุล</label><br>
-                <label><input type="checkbox" name="case3" value="เปลี่ยนชื่อตัวและสกุล"> เปลี่ยนชื่อตัวและสกุล</label><br>
-                <label><input type="checkbox" name="case3" value="ชำรุด"> ชำรุด</label><br>
-                <label><input type="checkbox" name="case3" id="case3-other" value="อื่นๆ"> อื่นๆ</label>
-                <div id="other-div" class="hidden mt-2">
-                    <label for="case3-othertext" class="block">ระบุเหตุผลอื่นๆ *</label>
-                    <input id="case3-othertext" type="text" class="border p-2 w-full">
-                </div><br>
-                <label for="case3-oldnum" class="block mt-2">หมายเลขบัตรเดิม (ถ้าทราบ)</label>
-                <input id="case3-oldnum" type="text" class="border p-2 w-full">
-            </div>
-            <h2 class="text-xl font-bold mt-6 mb-4">อัพโหลดเอกสาร</h2>
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="photos" class="block">โปรดแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน *</label>
-                    <input id="photos" type="file" multiple accept="image/*" class="border p-2 w-full" required>
-                </div>
-                <div>
-                    <label for="others" class="block">หลักฐานอื่น ๆ (ถ้ามี)</label>
-                    <input id="others" type="file" multiple class="border p-2 w-full">
-                </div>
-            </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded mt-6 hover:bg-blue-600">ส่งคำขอ</button>
-        </form>
-        <div id="recent-table" class="mt-8">
-            <h2 class="text-xl font-bold mb-4">ตารางรายชื่อที่จัดส่งล่าสุด (เรียงจากล่าสุดขึ้นก่อน)</h2>
-            <table id="dataTable" class="display w-full">
-                <thead>
-                    <tr>
-                        <th>ลำดับ</th>
-                        <th>ชื่อ-สกุล ผู้ยื่นคำขอ</th>
-                        <th>เจ้าหน้าที่ของรัฐประเภท</th>
-                        <th>กรณี</th>
-                        <th>สถานะ</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </main>
-    <footer class="bg-blue-600 text-white p-4 text-center mt-8">
-        © 2025 Copyright | พัฒนาโดย ทีม ICT สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2
-    </footer>
-    <div id="loading" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded shadow-lg text-center">
-            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4 animate-spin" style="border-top-color: #3498db;"></div>
-            <p>กำลังประมวลผล...</p>
-        </div>
+<body class="min-h-screen">
+  <div id="pageOverlay" class="overlay"><div class="spinner"></div></div>
+
+  <header class="w-full bg-fb-primary text-white shadow">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
+      <img src="https://lh3.googleusercontent.com/d/1reqwwQP7acieFotjwOkM4qYIg9w1A3rf" alt="logo" class="w-12 h-12 rounded" onerror="this.style.display='none'" />
+      <div>
+        <h1 class="text-xl md:text-2xl font-semibold">ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</h1>
+        <div class="text-sm md:text-base">สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2</div>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="adminBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm" type="button">สำหรับผู้ดูแลระบบ</button>
+        <button id="logoutBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm hidden" type="button">ออกจากระบบ</button>
+      </div>
     </div>
-    <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwj20bpWlrcMXz8D24a31guv2Vj3D0R1_u-09eaIkpcGB2Fr96UhQErfXI5twjGSUAOjQ/exec';
-        let isAdmin = localStorage.getItem('isAdmin') === 'true';
+  </header>
 
-        function showLoading() {
-            document.getElementById('loading').classList.remove('hidden');
-        }
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <section id="formSection" class="card p-4 md:p-6">
+      <h2 class="text-lg font-semibold mb-4">แบบคำขอ</h2>
+      <p class="text-sm text-gray-600 mb-4">โปรดกรอกข้อมูลตามความเป็นจริง และแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
+      <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium">วันที่</label>
+          <input type="date" name="requestDate" class="mt-1 w-full border rounded px-3 py-2" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium">เขียนที่</label>
+          <input type="text" name="writtenAt" class="mt-1 w-full border rounded px-3 py-2" placeholder="สถานที่" />
+        </div>
 
-        function hideLoading() {
-            document.getElementById('loading').classList.add('hidden');
-        }
+        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium">ชื่อ-สกุล ผู้ยื่นคำขอ</label>
+            <input type="text" name="fullName" class="mt-1 w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">เลขประจำตัวประชาชน</label>
+            <input type="text" name="nationalId" maxlength="13" class="mt-1 w-full border rounded px-3 py-2" placeholder="13 หลัก">
+          </div>
+        </div>
 
-        function calculateAge(dateStr) {
-            if (!dateStr) return '';
-            try {
-                const birth = new Date(dateStr);
-                const now = new Date();
-                
-                // แปลงปี ค.ศ. เป็น พ.ศ.
-                const birthYearBE = birth.getFullYear() + 543;
-                const currentYearBE = now.getFullYear() + 543;
-                
-                // คำนวณอายุ
-                let age = currentYearBE - birthYearBE;
-                const birthMonth = birth.getMonth();
-                const currentMonth = now.getMonth();
-                const birthDay = birth.getDate();
-                const currentDay = now.getDate();
-                
-                // ถ้าวันเกิดยังไม่ถึงในปีนี้ ลดอายุลง 1
-                if (birthMonth > currentMonth || (birthMonth === currentMonth && birthDay > currentDay)) {
-                    age--;
-                }
-                
-                return age;
-            } catch (err) {
-                console.error('Error calculating age:', err);
-                return '';
-            }
-        }
+        <div>
+          <label class="block text-sm font-medium">วันเดือนปีเกิด</label>
+          <input type="date" name="birthDate" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">อายุ</label>
+          <input type="number" name="age" min="0" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
 
-        document.getElementById('birthdate').addEventListener('change', (e) => {
-            document.getElementById('age').value = calculateAge(e.target.value);
-        });
+        <div>
+          <label class="block text-sm font-medium">สัญชาติ</label>
+          <input type="text" name="nationality" class="mt-1 w-full border rounded px-3 py-2" value="ไทย">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">หมู่โลหิต</label>
+          <input type="text" name="bloodType" class="mt-1 w-full border rounded px-3 py-2" placeholder="เช่น O, A, B, AB">
+        </div>
 
-        document.getElementById('prefix').addEventListener('change', (e) => {
-            const otherDiv = document.getElementById('prefix-other-div');
-            const otherInput = document.getElementById('prefix-other');
-            if (e.target.value === 'อื่นๆ') {
-                otherDiv.classList.remove('hidden');
-                otherInput.required = true;
-            } else {
-                otherDiv.classList.add('hidden');
-                otherInput.required = false;
-                otherInput.value = '';
-            }
-        });
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium">ที่อยู่ตามทะเบียนบ้าน/ที่อยู่ปัจจุบัน</label>
+          <textarea name="address" class="mt-1 w-full border rounded px-3 py-2" rows="2"></textarea>
+        </div>
 
-        document.getElementById('same-as-home').addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            const currentAddress = document.getElementById('currentaddress');
-            const currentZipcode = document.getElementById('currentzipcode');
-            const homeAddress = document.getElementById('homeaddress').value;
-            const homeZipcode = document.getElementById('homezipcode').value;
-            if (isChecked) {
-                currentAddress.value = homeAddress;
-                currentZipcode.value = homeZipcode;
-                currentAddress.disabled = true;
-                currentZipcode.disabled = true;
-            } else {
-                currentAddress.disabled = false;
-                currentZipcode.disabled = false;
-            }
-        });
+        <div>
+          <label class="block text-sm font-medium">จังหวัด</label>
+          <input type="text" name="province" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">รหัสไปรษณีย์</label>
+          <input type="text" name="zipcode" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
 
-        document.getElementById('homeaddress').addEventListener('input', () => {
-            if (document.getElementById('same-as-home').checked) {
-                document.getElementById('currentaddress').value = document.getElementById('homeaddress').value;
-            }
-        });
+        <div>
+          <label class="block text-sm font-medium">โทรศัพท์</label>
+          <input type="text" name="phone" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">อีเมล</label>
+          <input type="email" name="email" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
 
-        document.getElementById('homezipcode').addEventListener('input', () => {
-            if (document.getElementById('same-as-home').checked) {
-                document.getElementById('currentzipcode').value = document.getElementById('homezipcode').value;
-            }
-        });
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium">เจ้าหน้าที่ของรัฐประเภท</label>
+          <div class="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
+            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการครูและบุคลากรทางการศึกษา"> <span>ข้าราชการครูและบุคลากรทางการศึกษา</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ลูกจ้างประจำ"> <span>ลูกจ้างประจำ</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="พนักงานราชการ"> <span>พนักงานราชการ</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการบำนาญ"> <span>ข้าราชการบำนาญ</span></label>
+          </div>
+        </div>
 
-        document.getElementById('case-select').addEventListener('change', (e) => {
-            document.querySelectorAll('.case-div').forEach(div => div.classList.add('hidden'));
-            const num = e.target.value;
-            if (num) document.getElementById(`case${num}`).classList.remove('hidden');
-        });
+        <div>
+          <label class="block text-sm font-medium">ตำแหน่ง</label>
+          <input type="text" name="position" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">สถานศึกษา/หน่วยงาน</label>
+          <input type="text" name="school" class="mt-1 w-full border rounded px-3 py-2">
+        </div>
 
-        document.querySelector('input[id="case3-other"]').addEventListener('change', (e) => {
-            const otherDiv = document.getElementById('other-div');
-            const otherInput = document.getElementById('case3-othertext');
-            if (e.target.checked) {
-                otherDiv.classList.remove('hidden');
-                otherInput.required = true;
-            } else {
-                otherDiv.classList.add('hidden');
-                otherInput.required = false;
-                otherInput.value = '';
-            }
-        });
+        <div class="md:col-span-2 space-y-3">
+          <div>
+            <label class="block text-sm font-semibold mb-2">กรณี</label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label class="card p-3 border-2" id="case1Card">
+                <div class="flex items-center gap-2">
+                  <input type="radio" name="caseType" value="ขอมีบัตรครั้งแรก">
+                  <span class="font-medium">กรณีที่ 1 - ขอมีบัตรครั้งแรก</span>
+                </div>
+                <div class="mt-2 p-2 rounded bg-blue-50" id="case1Box" style="display:none">
+                  <div class="space-y-2">
+                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บรรจุใหม่"> <span>บรรจุใหม่</span></label>
+                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บัตรข้าราชการบำนาญ"> <span>บัตรข้าราชการบำนาญ</span></label>
+                  </div>
+                </div>
+              </label>
 
-        document.getElementById('admin-menu').addEventListener('click', () => {
-            Swal.fire({
-                title: 'เข้าสู่ระบบผู้ดูแล',
-                html: `
-                    <input id="swal-user" class="swal2-input" placeholder="ชื่อผู้ใช้">
-                    <input id="swal-pass" class="swal2-input" type="password" placeholder="รหัสผ่าน">
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'เข้าสู่ระบบ',
-                cancelButtonText: 'ยกเลิก',
-                preConfirm: () => {
-                    const user = document.getElementById('swal-user').value;
-                    const pass = document.getElementById('swal-pass').value;
-                    if (user === 'admin' && pass === '1234') {
-                        localStorage.setItem('isAdmin', 'true');
-                        isAdmin = true;
-                        document.getElementById('logout-span').classList.remove('hidden');
-                        loadTable();
-                        return true;
-                    } else {
-                        Swal.showValidationMessage('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-                    }
-                }
-            });
-        });
+              <label class="card p-3 border-2" id="case2Card">
+                <div class="flex items-center gap-2">
+                  <input type="radio" name="caseType" value="ขอมีบัตรใหม่">
+                  <span class="font-medium">กรณีที่ 2 - ขอมีบัตรใหม่</span>
+                </div>
+                <div class="mt-2 p-2 rounded bg-yellow-50" id="case2Box" style="display:none">
+                  <div class="space-y-2">
+                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหมดอายุ"> <span>บัตรหมดอายุ</span></label>
+                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหายหรือถูกทำลาย"> <span>บัตรหายหรือถูกทำลาย</span></label>
+                    <input type="text" name="oldCardNumber2" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
+                  </div>
+                </div>
+              </label>
 
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            localStorage.removeItem('isAdmin');
-            isAdmin = false;
-            document.getElementById('logout-span').classList.add('hidden');
-            loadTable();
-        });
+              <label class="card p-3 border-2" id="case3Card">
+                <div class="flex items-center gap-2">
+                  <input type="radio" name="caseType" value="ขอเปลี่ยนบัตร">
+                  <span class="font-medium">กรณีที่ 3 - ขอเปลี่ยนบัตร</span>
+                </div>
+                <div class="mt-2 p-2 rounded bg-green-50" id="case3Box" style="display:none">
+                  <div class="space-y-2">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน"> <span>เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน</span></label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัว"> <span>เปลี่ยนชื่อตัว</span></label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อสกุล"> <span>เปลี่ยนชื่อสกุล</span></label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัวและชื่อสกุล"> <span>เปลี่ยนชื่อตัวและชื่อสกุล</span></label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="ชำรุด"> <span>ชำรุด</span></label>
+                    <label class="flex items-center gap-2"><input id="case3OtherChk" type="checkbox" name="case3Reasons" value="อื่นๆ"> <span>อื่นๆ</span></label>
+                    <input id="case3OtherText" type="text" name="case3OtherText" placeholder="โปรดระบุเหตุผลเพิ่มเติม" class="w-full border rounded px-3 py-2" style="display:none">
+                    <input type="text" name="oldCardNumber3" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
 
-        if (isAdmin) {
-            document.getElementById('logout-span').classList.remove('hidden');
-        }
+        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium">รูปถ่าย 1</label>
+            <input type="file" id="photo1" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
+            <p class="text-xs text-gray-500 mt-1">โปรดแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">รูปถ่าย 2</label>
+            <input type="file" id="photo2" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">หลักฐานอื่น ๆ (ถ้ามี)</label>
+            <input type="file" id="otherDoc" accept="application/pdf,image/*" class="mt-1 w-full border rounded px-3 py-2">
+          </div>
+        </div>
 
-        async function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                if (!file || !file.type.startsWith('image/')) {
-                    reject(new Error(`ประเภทไฟล์ไม่ถูกต้องสำหรับ ${file.name} ต้องเป็นไฟล์รูปภาพเท่านั้น`));
-                    return;
-                }
-                if (file.size > 1 * 1024 * 1024) { // 1MB limit
-                    reject(new Error(`ไฟล์ ${file.name} มีขนาดใหญ่เกินไป สูงสุด 1MB`));
-                    return;
-                }
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    console.log(`อ่านไฟล์สำเร็จ: ${file.name}`);
-                    resolve(reader.result);
-                };
-                reader.onerror = error => {
-                    console.error(`เกิดข้อผิดพลาดในการอ่านไฟล์ ${file.name}:`, error);
-                    reject(new Error(`ไม่สามารถอ่านไฟล์ ${file.name}: ${error.message}`));
-                };
-            });
-        }
+        <div class="md:col-span-2 flex items-center gap-3 pt-2">
+          <button id="submitBtn" type="submit" class="bg-fb-primary hover:bg-fb-primaryDark text-white px-4 py-2 rounded">ส่งคำขอ</button>
+          <span id="submitStatus" class="text-sm text-gray-600"></span>
+        </div>
+      </form>
+    </section>
 
-        document.getElementById('request-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            if (!form.checkValidity()) {
-                Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง', 'error');
-                return;
-            }
-            const photoFiles = document.getElementById('photos').files;
-            if (photoFiles.length < 2) {
-                Swal.fire('ข้อผิดพลาด', 'โปรดแนบรูปถ่ายอย่างน้อย 2 ใบ', 'error');
-                return;
-            }
-            const prefixSelect = document.getElementById('prefix').value;
-            const prefix = prefixSelect === 'อื่นๆ' ? document.getElementById('prefix-other').value : prefixSelect;
-            if (prefixSelect === 'อื่นๆ' && !prefix) {
-                Swal.fire('ข้อผิดพลาด', 'กรุณาระบุคำนำหน้าอื่นๆ', 'error');
-                return;
-            }
-            const caseNum = document.getElementById('case-select').value;
-            let caseDetail = '';
-            if (caseNum === '1') {
-                const sub = document.querySelector('input[name="case1"]:checked');
-                if (!sub) {
-                    Swal.fire('ข้อผิดพลาด', 'กรุณาเลือกประเภทสำหรับกรณีที่ 1', 'error');
-                    return;
-                }
-                caseDetail = `กรณีที่ 1 - ขอมีบัตรครั้งแรก: ${sub.value}`;
-            } else if (caseNum === '2') {
-                const reason = document.querySelector('input[name="case2"]:checked');
-                if (!reason) {
-                    Swal.fire('ข้อผิดพลาด', 'กรุณาเลือกเหตุผลสำหรับกรณีที่ 2', 'error');
-                    return;
-                }
-                const oldnum = document.getElementById('case2-oldnum').value;
-                caseDetail = `กรณีที่ 2 - ขอมีบัตรใหม่: ${reason.value}${oldnum ? ', หมายเลขบัตรเดิม: ' + oldnum : ''}`;
-            } else if (caseNum === '3') {
-                const checked = document.querySelectorAll('input[name="case3"]:checked');
-                if (checked.length === 0) {
-                    Swal.fire('ข้อผิดพลาด', 'กรุณาเลือกอย่างน้อยหนึ่งเหตุผลสำหรับกรณีที่ 3', 'error');
-                    return;
-                }
-                let reasons = Array.from(checked).map(ch => ch.value);
-                const otherChecked = reasons.includes('อื่นๆ');
-                const othertext = document.getElementById('case3-othertext').value;
-                if (otherChecked && !othertext) {
-                    Swal.fire('ข้อผิดพลาด', 'กรุณาระบุเหตุผลอื่นๆ', 'error');
-                    return;
-                }
-                if (otherChecked) reasons = reasons.filter(r => r !== 'อื่นๆ').concat(othertext);
-                const oldnum = document.getElementById('case3-oldnum').value;
-                caseDetail = `กรณีที่ 3 - ขอเปลี่ยนบัตร: ${reasons.join(', ')}${oldnum ? ', หมายเลขบัตรเดิม: ' + oldnum : ''}`;
-            }
-            showLoading();
-            try {
-                console.log('กำลังเตรียมข้อมูลสำหรับส่ง...');
-                const photos = [];
-                for (let file of photoFiles) {
-                    const data = await fileToBase64(file);
-                    photos.push({ name: file.name, type: file.type, data: data.split(',')[1] });
-                }
-                console.log('ประมวลผลรูปถ่ายแล้ว:', photos.length);
-                const others = [];
-                const otherFiles = document.getElementById('others').files;
-                for (let file of otherFiles) {
-                    const data = await fileToBase64(file);
-                    others.push({ name: file.name, type: file.type, data: data.split(',')[1] });
-                }
-                console.log('ประมวลผลไฟล์อื่นๆ แล้ว:', others.length);
-                const formData = {
-                    prefix: prefix,
-                    firstname: document.getElementById('firstname').value,
-                    lastname: document.getElementById('lastname').value,
-                    idcard: document.getElementById('idcard').value,
-                    nationality: document.getElementById('nationality').value,
-                    birthdate: document.getElementById('birthdate').value,
-                    age: document.getElementById('age').value,
-                    bloodgroup: document.getElementById('bloodgroup').value,
-                    homeaddress: document.getElementById('homeaddress').value,
-                    homezipcode: document.getElementById('homezipcode').value,
-                    currentaddress: document.getElementById('currentaddress').value,
-                    currentzipcode: document.getElementById('currentzipcode').value,
-                    phone: document.getElementById('phone').value,
-                    email: document.getElementById('email').value,
-                    officertype: document.getElementById('officertype').value,
-                    groupschool: document.getElementById('groupschool').value,
-                    position: document.getElementById('position').value,
-                    casedetail: caseDetail,
-                    photos: JSON.stringify(photos),
-                    others: JSON.stringify(others)
-                };
-                console.log('ส่งข้อมูลไปยัง:', SCRIPT_URL);
-                const params = new URLSearchParams(formData);
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    body: params
-                });
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
-                }
-                const data = await response.json();
-                console.log('การตอบกลับจากเซิร์ฟเวอร์:', data);
-                if (data.status === 'success') {
-                    Swal.fire('สำเร็จ', 'ส่งคำขอเรียบร้อย', 'success');
-                    form.reset();
-                    document.getElementById('age').value = '';
-                    document.getElementById('same-as-home').checked = false;
-                    document.getElementById('currentaddress').disabled = false;
-                    document.getElementById('currentzipcode').disabled = false;
-                    document.getElementById('prefix-other-div').classList.add('hidden');
-                    document.getElementById('prefix-other').required = false;
-                    document.getElementById('prefix-other').value = '';
-                    document.getElementById('case3-other').checked = false;
-                    document.getElementById('other-div').classList.add('hidden');
-                    document.getElementById('case3-othertext').required = false;
-                    document.getElementById('case3-othertext').value = '';
-                    document.querySelectorAll('.case-div').forEach(div => div.classList.add('hidden'));
-                    loadTable();
-                } else {
-                    throw new Error(data.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
-                }
-            } catch (err) {
-                console.error('ข้อผิดพลาดในการส่งฟอร์ม:', err);
-                Swal.fire('ข้อผิดพลาด', `ไม่สามารถส่งคำขอได้: ${err.message}`, 'error');
-            } finally {
-                hideLoading();
-            }
-        });
+    <section id="tableSection" class="card p-4 md:p-6">
+      <h2 class="text-lg font-semibold mb-4">รายการคำขอที่ส่งล่าสุด</h2>
+      <table id="submissionsTable" class="display w-full text-sm"></table>
+    </section>
+  </main>
 
-        async function loadTable() {
-            showLoading();
-            try {
-                console.log('กำลังดึงข้อมูลตารางจาก:', SCRIPT_URL);
-                const response = await fetch(`${SCRIPT_URL}?action=getData`);
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
-                }
-                const { data } = await response.json();
-                console.log('ได้รับข้อมูลตาราง:', data);
-                $('#dataTable').DataTable().destroy();
-                let columns = [
-                    { title: 'ลำดับ', render: (data, type, row, meta) => meta.row + 1 },
-                    { title: 'ชื่อ-สกุล ผู้ยื่นคำขอ', data: 'fullname' },
-                    { title: 'เจ้าหน้าที่ของรัฐประเภท', data: 'officertype' },
-                    { title: 'กรณี', data: 'case' },
-                    { title: 'สถานะ', render: (data, type, row) => `<span class="px-2 py-1 rounded ${data === 'อยู่ระหว่างตรวจสอบ' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}">${data}</span>` }
-                ];
-                if (isAdmin) {
-                    columns.push({
-                        title: 'ดูเอกสาร',
-                        render: (data, type, row) => `<button class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600" onclick="viewDocs('${row.photos}${row.others ? ',' + row.others : ''}')">ดู</button>`
-                    });
-                    columns.push({
-                        title: 'เปลี่ยนสถานะ',
-                        render: (data, type, row) => `
-                            <select onchange="updateStatus(${row.row}, this.value)" class="border p-1 rounded">
-                                <option value="อยู่ระหว่างตรวจสอบ" ${row.status === 'อยู่ระหว่างตรวจสอบ' ? 'selected' : ''}>อยู่ระหว่างตรวจสอบ</option>
-                                <option value="ตรวจสอบแล้ว" ${row.status === 'ตรวจสอบแล้ว' ? 'selected' : ''}>ตรวจสอบแล้ว</option>
-                            </select>
-                        `
-                    });
-                }
-                $('#dataTable').DataTable({
-                    data: data,
-                    columns: columns,
-                    pageLength: 10,
-                    language: { url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json' },
-                    order: [[0, 'desc']]
-                });
-            } catch (err) {
-                console.error('ข้อผิดพลาดในการโหลดตาราง:', err);
-                Swal.fire('ข้อผิดพลาด', `ไม่สามารถดึงข้อมูลได้: ${err.message}`, 'error');
-            } finally {
-                hideLoading();
-            }
-        }
+  <footer class="text-center text-gray-600 py-6">
+    © 2025 Copyright | พัฒนาโดย ทีม ICT สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2
+  </footer>
 
-        window.viewDocs = (urls) => {
-            try {
-                console.log('กำลังดูเอกสาร:', urls);
-                const links = urls.split(',').filter(u => u).map(u => `<a href="${u}" target="_blank" class="text-blue-500 hover:underline">เปิดเอกสาร</a><br>`).join('');
-                Swal.fire({
-                    title: 'เอกสาร',
-                    html: links,
-                    width: '80%',
-                    showCloseButton: true
-                });
-            } catch (err) {
-                console.error('ข้อผิดพลาดในการดูเอกสาร:', err);
-                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถแสดงเอกสารได้: ' + err.message, 'error');
-            }
-        };
-
-        window.updateStatus = async (row, value) => {
-            Swal.fire({
-                title: 'ยืนยันการเปลี่ยนสถานะ?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'ยืนยัน',
-                cancelButtonText: 'ยกเลิก'
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    showLoading();
-                    try {
-                        console.log(`กำลังอัปเดตสถานะสำหรับแถว ${row} เป็น ${value}`);
-                        const params = new URLSearchParams({ action: 'updateStatus', row: row, status: value });
-                        const response = await fetch(SCRIPT_URL, {
-                            method: 'POST',
-                            body: params
-                        });
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
-                        }
-                        const data = await response.json();
-                        console.log('การตอบกลับจากการอัปเดตสถานะ:', data);
-                        if (data.status === 'success') {
-                            Swal.fire('สำเร็จ', 'อัปเดตสถานะเรียบร้อย', 'success');
-                            loadTable();
-                        } else {
-                            throw new Error(data.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ');
-                        }
-                    } catch (err) {
-                        console.error('ข้อผิดพลาดในการอัปเดตสถานะ:', err);
-                        Swal.fire('ข้อผิดพลาด', `เกิดข้อผิดพลาด: ${err.message}`, 'error');
-                    } finally {
-                        hideLoading();
-                    }
-                }
-            });
-        };
-
-        // ทดสอบการเชื่อมต่อ Web App เมื่อโหลดหน้า
-        async function testConnectivity() {
-            try {
-                console.log('กำลังทดสอบการเชื่อมต่อไปยัง:', SCRIPT_URL);
-                const response = await fetch(SCRIPT_URL, { method: 'GET' });
-                console.log('ผลการทดสอบการเชื่อมต่อ:', response.status);
-                if (!response.ok) {
-                    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการตั้งค่า', 'error');
-                }
-            } catch (err) {
-                console.error('การทดสอบการเชื่อมต่อล้มเหลว:', err);
-                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: ' + err.message, 'error');
-            }
-        }
-
-        testConnectivity();
-        loadTable();
-    </script>
+  <script src="app.js"></script>
 </body>
 </html>
