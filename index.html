@@ -1,233 +1,464 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
-          colors: {
-            fb: {
-              bg: '#f0f2f5',
-              primary: '#1877f2',
-              primaryDark: '#166fe5'
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <link href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css" rel="stylesheet"/>
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"></script>
-  <style>
-    body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; }
-    .card { background: white; border-radius: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-    .badge { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-    .status-pending { background: #fef08a; color: #854d0e; }
-    .status-done { background: #bbf7d0; color: #166534; }
-    .overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 60; }
-    .spinner { width: 3rem; height: 3rem; border: 4px solid #93c5fd; border-top-color: #1877f2; border-radius: 9999px; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body class="min-h-screen">
-  <div id="pageOverlay" class="overlay"><div class="spinner"></div></div>
-
-  <header class="w-full bg-fb-primary text-white shadow">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
-      <img src="https://lh3.googleusercontent.com/d/1reqwwQP7acieFotjwOkM4qYIg9w1A3rf" alt="logo" class="w-12 h-12 rounded" onerror="this.style.display='none'" />
-      <div>
-        <h1 class="text-xl md:text-2xl font-semibold">ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</h1>
-        <div class="text-sm md:text-base">สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2</div>
-      </div>
-      <div class="ml-auto flex items-center gap-2">
-        <button id="adminBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm" type="button">สำหรับผู้ดูแลระบบ</button>
-        <button id="logoutBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm hidden" type="button">ออกจากระบบ</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-    <section id="formSection" class="card p-4 md:p-6">
-      <h2 class="text-lg font-semibold mb-4">แบบคำขอ</h2>
-      <p class="text-sm text-gray-600 mb-4">โปรดกรอกข้อมูลตามความเป็นจริง และแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
-      <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium">วันที่</label>
-          <input type="date" name="requestDate" class="mt-1 w-full border rounded px-3 py-2" required>
-        </div>
-        <div>
-          <label class="block text-sm font-medium">เขียนที่</label>
-          <input type="text" name="writtenAt" class="mt-1 w-full border rounded px-3 py-2" placeholder="สถานที่" />
-        </div>
-
-        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium">ชื่อ-สกุล ผู้ยื่นคำขอ</label>
-            <input type="text" name="fullName" class="mt-1 w-full border rounded px-3 py-2" required>
-          </div>
-          <div>
-            <label class="block text-sm font-medium">เลขประจำตัวประชาชน</label>
-            <input type="text" name="nationalId" maxlength="13" class="mt-1 w-full border rounded px-3 py-2" placeholder="13 หลัก">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium">วันเดือนปีเกิด</label>
-          <input type="date" name="birthDate" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium">อายุ</label>
-          <input type="number" name="age" min="0" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium">สัญชาติ</label>
-          <input type="text" name="nationality" class="mt-1 w-full border rounded px-3 py-2" value="ไทย">
-        </div>
-        <div>
-          <label class="block text-sm font-medium">หมู่โลหิต</label>
-          <input type="text" name="bloodType" class="mt-1 w-full border rounded px-3 py-2" placeholder="เช่น O, A, B, AB">
-        </div>
-
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium">ที่อยู่ตามทะเบียนบ้าน/ที่อยู่ปัจจุบัน</label>
-          <textarea name="address" class="mt-1 w-full border rounded px-3 py-2" rows="2"></textarea>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium">จังหวัด</label>
-          <input type="text" name="province" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium">รหัสไปรษณีย์</label>
-          <input type="text" name="zipcode" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium">โทรศัพท์</label>
-          <input type="text" name="phone" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium">อีเมล</label>
-          <input type="email" name="email" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium">เจ้าหน้าที่ของรัฐประเภท</label>
-          <div class="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการครูและบุคลากรทางการศึกษา"> <span>ข้าราชการครูและบุคลากรทางการศึกษา</span></label>
-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ลูกจ้างประจำ"> <span>ลูกจ้างประจำ</span></label>
-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="พนักงานราชการ"> <span>พนักงานราชการ</span></label>
-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการบำนาญ"> <span>ข้าราชการบำนาญ</span></label>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium">ตำแหน่ง</label>
-          <input type="text" name="position" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium">สถานศึกษา/หน่วยงาน</label>
-          <input type="text" name="school" class="mt-1 w-full border rounded px-3 py-2">
-        </div>
-
-        <div class="md:col-span-2 space-y-3">
-          <div>
-            <label class="block text-sm font-semibold mb-2">กรณี</label>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <label class="card p-3 border-2" id="case1Card">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="caseType" value="ขอมีบัตรครั้งแรก">
-                  <span class="font-medium">กรณีที่ 1 - ขอมีบัตรครั้งแรก</span>
-                </div>
-                <div class="mt-2 p-2 rounded bg-blue-50" id="case1Box" style="display:none">
-                  <div class="space-y-2">
-                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บรรจุใหม่"> <span>บรรจุใหม่</span></label>
-                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บัตรข้าราชการบำนาญ"> <span>บัตรข้าราชการบำนาญ</span></label>
-                  </div>
-                </div>
-              </label>
-
-              <label class="card p-3 border-2" id="case2Card">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="caseType" value="ขอมีบัตรใหม่">
-                  <span class="font-medium">กรณีที่ 2 - ขอมีบัตรใหม่</span>
-                </div>
-                <div class="mt-2 p-2 rounded bg-yellow-50" id="case2Box" style="display:none">
-                  <div class="space-y-2">
-                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหมดอายุ"> <span>บัตรหมดอายุ</span></label>
-                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหายหรือถูกทำลาย"> <span>บัตรหายหรือถูกทำลาย</span></label>
-                    <input type="text" name="oldCardNumber2" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
-                  </div>
-                </div>
-              </label>
-
-              <label class="card p-3 border-2" id="case3Card">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="caseType" value="ขอเปลี่ยนบัตร">
-                  <span class="font-medium">กรณีที่ 3 - ขอเปลี่ยนบัตร</span>
-                </div>
-                <div class="mt-2 p-2 rounded bg-green-50" id="case3Box" style="display:none">
-                  <div class="space-y-2">
-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน"> <span>เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน</span></label>
-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัว"> <span>เปลี่ยนชื่อตัว</span></label>
-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อสกุล"> <span>เปลี่ยนชื่อสกุล</span></label>
-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัวและชื่อสกุล"> <span>เปลี่ยนชื่อตัวและชื่อสกุล</span></label>
-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="ชำรุด"> <span>ชำรุด</span></label>
-                    <label class="flex items-center gap-2"><input id="case3OtherChk" type="checkbox" name="case3Reasons" value="อื่นๆ"> <span>อื่นๆ</span></label>
-                    <input id="case3OtherText" type="text" name="case3OtherText" placeholder="โปรดระบุเหตุผลเพิ่มเติม" class="w-full border rounded px-3 py-2" style="display:none">
-                    <input type="text" name="oldCardNumber3" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-medium">รูปถ่าย 1</label>
-            <input type="file" id="photo1" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
-            <p class="text-xs text-gray-500 mt-1">โปรดแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium">รูปถ่าย 2</label>
-            <input type="file" id="photo2" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
-          </div>
-          <div>
-            <label class="block text-sm font-medium">หลักฐานอื่น ๆ (ถ้ามี)</label>
-            <input type="file" id="otherDoc" accept="application/pdf,image/*" class="mt-1 w-full border rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="md:col-span-2 flex items-center gap-3 pt-2">
-          <button id="submitBtn" type="submit" class="bg-fb-primary hover:bg-fb-primaryDark text-white px-4 py-2 rounded">ส่งคำขอ</button>
-          <span id="submitStatus" class="text-sm text-gray-600"></span>
-        </div>
-      </form>
-    </section>
-
-    <section id="tableSection" class="card p-4 md:p-6">
-      <h2 class="text-lg font-semibold mb-4">รายการคำขอที่ส่งล่าสุด</h2>
-      <table id="submissionsTable" class="display w-full text-sm"></table>
-    </section>
-  </main>
-
-  <footer class="text-center text-gray-600 py-6">
-    © 2025 Copyright | พัฒนาโดย ทีม ICT สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2
-  </footer>
-
-  <script src="app.js"></script>
-</body>
-</html>
+(cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF'
+diff --git a/index.html b/index.html
+--- a/index.html
++++ b/index.html
+@@ -1,233 +1,224 @@
+-<!DOCTYPE html>
+-<html lang="th">
+-<head>
+-  <meta charset="utf-8">
+-  <meta name="viewport" content="width=device-width, initial-scale=1">
+-  <title>ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</title>
+-  <link rel="preconnect" href="https://fonts.googleapis.com">
+-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+-  <script src="https://cdn.tailwindcss.com"></script>
+-  <script>
+-    tailwind.config = {
+-      theme: {
+-        extend: {
+-          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+-          colors: {
+-            fb: {
+-              bg: '#f0f2f5',
+-              primary: '#1877f2',
+-              primaryDark: '#166fe5'
+-            }
+-          }
+-        }
+-      }
+-    }
+-  </script>
+-  <link href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css" rel="stylesheet"/>
+-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+-  <script src="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.js"></script>
+-  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" />
+-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"></script>
+-  <style>
+-    body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; }
+-    .card { background: white; border-radius: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+-    .badge { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+-    .status-pending { background: #fef08a; color: #854d0e; }
+-    .status-done { background: #bbf7d0; color: #166534; }
+-    .overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 60; }
+-    .spinner { width: 3rem; height: 3rem; border: 4px solid #93c5fd; border-top-color: #1877f2; border-radius: 9999px; animation: spin 1s linear infinite; }
+-    @keyframes spin { to { transform: rotate(360deg); } }
+-  </style>
+-</head>
+-<body class="min-h-screen">
+-  <div id="pageOverlay" class="overlay"><div class="spinner"></div></div>
+-
+-  <header class="w-full bg-fb-primary text-white shadow">
+-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
+-      <img src="https://lh3.googleusercontent.com/d/1reqwwQP7acieFotjwOkM4qYIg9w1A3rf" alt="logo" class="w-12 h-12 rounded" onerror="this.style.display='none'" />
+-      <div>
+-        <h1 class="text-xl md:text-2xl font-semibold">ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</h1>
+-        <div class="text-sm md:text-base">สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2</div>
+-      </div>
+-      <div class="ml-auto flex items-center gap-2">
+-        <button id="adminBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm" type="button">สำหรับผู้ดูแลระบบ</button>
+-        <button id="logoutBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm hidden" type="button">ออกจากระบบ</button>
+-      </div>
+-    </div>
+-  </header>
+-
+-  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+-    <section id="formSection" class="card p-4 md:p-6">
+-      <h2 class="text-lg font-semibold mb-4">แบบคำขอ</h2>
+-      <p class="text-sm text-gray-600 mb-4">โปรดกรอกข้อมูลตามความเป็นจริง และแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
+-      <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+-        <div>
+-          <label class="block text-sm font-medium">วันที่</label>
+-          <input type="date" name="requestDate" class="mt-1 w-full border rounded px-3 py-2" required>
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">เขียนที่</label>
+-          <input type="text" name="writtenAt" class="mt-1 w-full border rounded px-3 py-2" placeholder="สถานที่" />
+-        </div>
+-
+-        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+-          <div>
+-            <label class="block text-sm font-medium">ชื่อ-สกุล ผู้ยื่นคำขอ</label>
+-            <input type="text" name="fullName" class="mt-1 w-full border rounded px-3 py-2" required>
+-          </div>
+-          <div>
+-            <label class="block text-sm font-medium">เลขประจำตัวประชาชน</label>
+-            <input type="text" name="nationalId" maxlength="13" class="mt-1 w-full border rounded px-3 py-2" placeholder="13 หลัก">
+-          </div>
+-        </div>
+-
+-        <div>
+-          <label class="block text-sm font-medium">วันเดือนปีเกิด</label>
+-          <input type="date" name="birthDate" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">อายุ</label>
+-          <input type="number" name="age" min="0" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-
+-        <div>
+-          <label class="block text-sm font-medium">สัญชาติ</label>
+-          <input type="text" name="nationality" class="mt-1 w-full border rounded px-3 py-2" value="ไทย">
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">หมู่โลหิต</label>
+-          <input type="text" name="bloodType" class="mt-1 w-full border rounded px-3 py-2" placeholder="เช่น O, A, B, AB">
+-        </div>
+-
+-        <div class="md:col-span-2">
+-          <label class="block text-sm font-medium">ที่อยู่ตามทะเบียนบ้าน/ที่อยู่ปัจจุบัน</label>
+-          <textarea name="address" class="mt-1 w-full border rounded px-3 py-2" rows="2"></textarea>
+-        </div>
+-
+-        <div>
+-          <label class="block text-sm font-medium">จังหวัด</label>
+-          <input type="text" name="province" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">รหัสไปรษณีย์</label>
+-          <input type="text" name="zipcode" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-
+-        <div>
+-          <label class="block text-sm font-medium">โทรศัพท์</label>
+-          <input type="text" name="phone" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">อีเมล</label>
+-          <input type="email" name="email" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-
+-        <div class="md:col-span-2">
+-          <label class="block text-sm font-medium">เจ้าหน้าที่ของรัฐประเภท</label>
+-          <div class="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
+-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการครูและบุคลากรทางการศึกษา"> <span>ข้าราชการครูและบุคลากรทางการศึกษา</span></label>
+-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ลูกจ้างประจำ"> <span>ลูกจ้างประจำ</span></label>
+-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="พนักงานราชการ"> <span>พนักงานราชการ</span></label>
+-            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการบำนาญ"> <span>ข้าราชการบำนาญ</span></label>
+-          </div>
+-        </div>
+-
+-        <div>
+-          <label class="block text-sm font-medium">ตำแหน่ง</label>
+-          <input type="text" name="position" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-        <div>
+-          <label class="block text-sm font-medium">สถานศึกษา/หน่วยงาน</label>
+-          <input type="text" name="school" class="mt-1 w-full border rounded px-3 py-2">
+-        </div>
+-
+-        <div class="md:col-span-2 space-y-3">
+-          <div>
+-            <label class="block text-sm font-semibold mb-2">กรณี</label>
+-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+-              <label class="card p-3 border-2" id="case1Card">
+-                <div class="flex items-center gap-2">
+-                  <input type="radio" name="caseType" value="ขอมีบัตรครั้งแรก">
+-                  <span class="font-medium">กรณีที่ 1 - ขอมีบัตรครั้งแรก</span>
+-                </div>
+-                <div class="mt-2 p-2 rounded bg-blue-50" id="case1Box" style="display:none">
+-                  <div class="space-y-2">
+-                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บรรจุใหม่"> <span>บรรจุใหม่</span></label>
+-                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บัตรข้าราชการบำนาญ"> <span>บัตรข้าราชการบำนาญ</span></label>
+-                  </div>
+-                </div>
+-              </label>
+-
+-              <label class="card p-3 border-2" id="case2Card">
+-                <div class="flex items-center gap-2">
+-                  <input type="radio" name="caseType" value="ขอมีบัตรใหม่">
+-                  <span class="font-medium">กรณีที่ 2 - ขอมีบัตรใหม่</span>
+-                </div>
+-                <div class="mt-2 p-2 rounded bg-yellow-50" id="case2Box" style="display:none">
+-                  <div class="space-y-2">
+-                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหมดอายุ"> <span>บัตรหมดอายุ</span></label>
+-                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหายหรือถูกทำลาย"> <span>บัตรหายหรือถูกทำลาย</span></label>
+-                    <input type="text" name="oldCardNumber2" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
+-                  </div>
+-                </div>
+-              </label>
+-
+-              <label class="card p-3 border-2" id="case3Card">
+-                <div class="flex items-center gap-2">
+-                  <input type="radio" name="caseType" value="ขอเปลี่ยนบัตร">
+-                  <span class="font-medium">กรณีที่ 3 - ขอเปลี่ยนบัตร</span>
+-                </div>
+-                <div class="mt-2 p-2 rounded bg-green-50" id="case3Box" style="display:none">
+-                  <div class="space-y-2">
+-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน"> <span>เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน</span></label>
+-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัว"> <span>เปลี่ยนชื่อตัว</span></label>
+-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อสกุล"> <span>เปลี่ยนชื่อสกุล</span></label>
+-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัวและชื่อสกุล"> <span>เปลี่ยนชื่อตัวและชื่อสกุล</span></label>
+-                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="ชำรุด"> <span>ชำรุด</span></label>
+-                    <label class="flex items-center gap-2"><input id="case3OtherChk" type="checkbox" name="case3Reasons" value="อื่นๆ"> <span>อื่นๆ</span></label>
+-                    <input id="case3OtherText" type="text" name="case3OtherText" placeholder="โปรดระบุเหตุผลเพิ่มเติม" class="w-full border rounded px-3 py-2" style="display:none">
+-                    <input type="text" name="oldCardNumber3" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
+-                  </div>
+-                </div>
+-              </label>
+-            </div>
+-          </div>
+-        </div>
+-
+-        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+-          <div>
+-            <label class="block text-sm font-medium">รูปถ่าย 1</label>
+-            <input type="file" id="photo1" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
+-            <p class="text-xs text-gray-500 mt-1">โปรดแนบรูปถ่าย 2 ใบ ถ่ายไม่เกิน 6 เดือน</p>
+-          </div>
+-          <div>
+-            <label class="block text-sm font-medium">รูปถ่าย 2</label>
+-            <input type="file" id="photo2" accept="image/*" class="mt-1 w-full border rounded px-3 py-2" required>
+-          </div>
+-          <div>
+-            <label class="block text-sm font-medium">หลักฐานอื่น ๆ (ถ้ามี)</label>
+-            <input type="file" id="otherDoc" accept="application/pdf,image/*" class="mt-1 w-full border rounded px-3 py-2">
+-          </div>
+-        </div>
+-
+-        <div class="md:col-span-2 flex items-center gap-3 pt-2">
+-          <button id="submitBtn" type="submit" class="bg-fb-primary hover:bg-fb-primaryDark text-white px-4 py-2 rounded">ส่งคำขอ</button>
+-          <span id="submitStatus" class="text-sm text-gray-600"></span>
+-        </div>
+-      </form>
+-    </section>
+-
+-    <section id="tableSection" class="card p-4 md:p-6">
+-      <h2 class="text-lg font-semibold mb-4">รายการคำขอที่ส่งล่าสุด</h2>
+-      <table id="submissionsTable" class="display w-full text-sm"></table>
+-    </section>
+-  </main>
+-
+-  <footer class="text-center text-gray-600 py-6">
+-    © 2025 Copyright | พัฒนาโดย ทีม ICT สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2
+-  </footer>
+-
+-  <script src="app.js"></script>
+-</body>
+-</html>
++<!DOCTYPE html>
++<html lang="th">
++<head>
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1">
++  <title>ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</title>
++  <link rel="preconnect" href="https://fonts.googleapis.com">
++  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
++  <script src="https://cdn.tailwindcss.com"></script>
++  <script>
++    tailwind.config = {
++      theme: {
++        extend: {
++          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
++          colors: {
++            fb: {
++              bg: '#f0f2f5',
++              primary: '#1877f2',
++              primaryDark: '#166fe5'
++            }
++          }
++        }
++      }
++    }
++  </script>
++  <link href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css" rel="stylesheet"/>
++  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
++  <script src="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.js"></script>
++  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" />
++  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"></script>
++  <style>
++    body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; }
++    .card { background: white; border-radius: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
++    .badge { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
++    .status-pending { background: #fef08a; color: #854d0e; }
++    .status-done { background: #bbf7d0; color: #166534; }
++    .overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 60; }
++    .spinner { width: 3rem; height: 3rem; border: 4px solid #93c5fd; border-top-color: #1877f2; border-radius: 9999px; animation: spin 1s linear infinite; }
++    @keyframes spin { to { transform: rotate(360deg); } }
++  </style>
++</head>
++<body class="min-h-screen">
++  <div id="pageOverlay" class="overlay"><div class="spinner"></div></div>
++
++  <header class="w-full bg-fb-primary text-white shadow">
++    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
++      <img src="https://lh3.googleusercontent.com/d/1reqwwQP7acieFotjwOkM4qYIg9w1A3rf" alt="logo" class="w-12 h-12 rounded" onerror="this.style.display='none'" />
++      <div>
++        <h1 class="text-xl md:text-2xl font-semibold">ระบบขอมีบัตรประจำตัวหรือขอบัตรประจำตัวใหม่ออนไลน์</h1>
++        <div class="text-sm md:text-base">สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2</div>
++      </div>
++      <div class="ml-auto flex items-center gap-2">
++        <button id="adminBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm" type="button">สำหรับผู้ดูแลระบบ</button>
++        <button id="logoutBtn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm hidden" type="button">ออกจากระบบ</button>
++      </div>
++    </div>
++  </header>
++
++  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
++    <section id="formSection" class="card p-4 md:p-6">
++      <h2 class="text-lg font-semibold mb-4">แบบคำขอ</h2>
++      <p class="text-sm text-gray-600 mb-4">โปรดกรอกข้อมูลตามความเป็นจริง</p>
++      <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
++        <div>
++          <label class="block text-sm font-medium">วันที่</label>
++          <input type="date" name="requestDate" class="mt-1 w-full border rounded px-3 py-2" required>
++        </div>
++        <div>
++          <label class="block text-sm font-medium">เขียนที่</label>
++          <input type="text" name="writtenAt" class="mt-1 w-full border rounded px-3 py-2" placeholder="สถานที่" />
++        </div>
++
++        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
++          <div>
++            <label class="block text-sm font-medium">ชื่อ-สกุล ผู้ยื่นคำขอ</label>
++            <input type="text" name="fullName" class="mt-1 w-full border rounded px-3 py-2" required>
++          </div>
++          <div>
++            <label class="block text-sm font-medium">เลขประจำตัวประชาชน</label>
++            <input type="text" name="nationalId" maxlength="13" class="mt-1 w-full border rounded px-3 py-2" placeholder="13 หลัก">
++          </div>
++        </div>
++
++        <div>
++          <label class="block text-sm font-medium">วันเดือนปีเกิด</label>
++          <input type="date" name="birthDate" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++        <div>
++          <label class="block text-sm font-medium">อายุ</label>
++          <input type="number" name="age" min="0" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++
++        <div>
++          <label class="block text-sm font-medium">สัญชาติ</label>
++          <input type="text" name="nationality" class="mt-1 w-full border rounded px-3 py-2" value="ไทย">
++        </div>
++        <div>
++          <label class="block text-sm font-medium">หมู่โลหิต</label>
++          <input type="text" name="bloodType" class="mt-1 w-full border rounded px-3 py-2" placeholder="เช่น O, A, B, AB">
++        </div>
++
++        <div class="md:col-span-2">
++          <label class="block text-sm font-medium">ที่อยู่ตามทะเบียนบ้าน/ที่อยู่ปัจจุบัน</label>
++          <textarea name="address" class="mt-1 w-full border rounded px-3 py-2" rows="2"></textarea>
++        </div>
++
++        <div>
++          <label class="block text-sm font-medium">จังหวัด</label>
++          <input type="text" name="province" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++        <div>
++          <label class="block text-sm font-medium">รหัสไปรษณีย์</label>
++          <input type="text" name="zipcode" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++
++        <div>
++          <label class="block text-sm font-medium">โทรศัพท์</label>
++          <input type="text" name="phone" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++        <div>
++          <label class="block text-sm font-medium">อีเมล</label>
++          <input type="email" name="email" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++
++        <div class="md:col-span-2">
++          <label class="block text-sm font-medium">เจ้าหน้าที่ของรัฐประเภท</label>
++          <div class="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
++            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการครูและบุคลากรทางการศึกษา"> <span>ข้าราชการครูและบุคลากรทางการศึกษา</span></label>
++            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ลูกจ้างประจำ"> <span>ลูกจ้างประจำ</span></label>
++            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="พนักงานราชการ"> <span>พนักงานราชการ</span></label>
++            <label class="flex items-center gap-2"><input type="radio" name="officerType" value="ข้าราชการบำนาญ"> <span>ข้าราชการบำนาญ</span></label>
++          </div>
++        </div>
++
++        <div>
++          <label class="block text-sm font-medium">ตำแหน่ง</label>
++          <input type="text" name="position" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++        <div>
++          <label class="block text-sm font-medium">สถานศึกษา/หน่วยงาน</label>
++          <input type="text" name="school" class="mt-1 w-full border rounded px-3 py-2">
++        </div>
++
++        <div class="md:col-span-2 space-y-3">
++          <div>
++            <label class="block text-sm font-semibold mb-2">กรณี</label>
++            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
++              <label class="card p-3 border-2" id="case1Card">
++                <div class="flex items-center gap-2">
++                  <input type="radio" name="caseType" value="ขอมีบัตรครั้งแรก">
++                  <span class="font-medium">กรณีที่ 1 - ขอมีบัตรครั้งแรก</span>
++                </div>
++                <div class="mt-2 p-2 rounded bg-blue-50" id="case1Box" style="display:none">
++                  <div class="space-y-2">
++                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บรรจุใหม่"> <span>บรรจุใหม่</span></label>
++                    <label class="flex items-center gap-2"><input type="radio" name="case1Reason" value="บัตรข้าราชการบำนาญ"> <span>บัตรข้าราชการบำนาญ</span></label>
++                  </div>
++                </div>
++              </label>
++
++              <label class="card p-3 border-2" id="case2Card">
++                <div class="flex items-center gap-2">
++                  <input type="radio" name="caseType" value="ขอมีบัตรใหม่">
++                  <span class="font-medium">กรณีที่ 2 - ขอมีบัตรใหม่</span>
++                </div>
++                <div class="mt-2 p-2 rounded bg-yellow-50" id="case2Box" style="display:none">
++                  <div class="space-y-2">
++                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหมดอายุ"> <span>บัตรหมดอายุ</span></label>
++                    <label class="flex items-center gap-2"><input type="radio" name="case2Reason" value="บัตรหายหรือถูกทำลาย"> <span>บัตรหายหรือถูกทำลาย</span></label>
++                    <input type="text" name="oldCardNumber2" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
++                  </div>
++                </div>
++              </label>
++
++              <label class="card p-3 border-2" id="case3Card">
++                <div class="flex items-center gap-2">
++                  <input type="radio" name="caseType" value="ขอเปลี่ยนบัตร">
++                  <span class="font-medium">กรณีที่ 3 - ขอเปลี่ยนบัตร</span>
++                </div>
++                <div class="mt-2 p-2 rounded bg-green-50" id="case3Box" style="display:none">
++                  <div class="space-y-2">
++                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน"> <span>เปลี่ยนตำแหน่ง/ย้ายสถานที่ทำงาน</span></label>
++                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัว"> <span>เปลี่ยนชื่อตัว</span></label>
++                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อสกุล"> <span>เปลี่ยนชื่อสกุล</span></label>
++                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="เปลี่ยนชื่อตัวและชื่อสกุล"> <span>เปลี่ยนชื่อตัวและชื่อสกุล</span></label>
++                    <label class="flex items-center gap-2"><input type="checkbox" name="case3Reasons" value="ชำรุด"> <span>ชำรุด</span></label>
++                    <label class="flex items-center gap-2"><input id="case3OtherChk" type="checkbox" name="case3Reasons" value="อื่นๆ"> <span>อื่นๆ</span></label>
++                    <input id="case3OtherText" type="text" name="case3OtherText" placeholder="โปรดระบุเหตุผลเพิ่มเติม" class="w-full border rounded px-3 py-2" style="display:none">
++                    <input type="text" name="oldCardNumber3" placeholder="หมายเลขบัตรเดิม (ถ้าทราบ)" class="w-full border rounded px-3 py-2">
++                  </div>
++                </div>
++              </label>
++            </div>
++          </div>
++        </div>
++
++        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
++          <div>
++            <label class="block text-sm font-medium">หลักฐานอื่น ๆ (ถ้ามี)</label>
++            <input type="file" id="otherDoc" accept="application/pdf,image/*" class="mt-1 w-full border rounded px-3 py-2">
++          </div>
++        </div>
++
++        <div class="md:col-span-2 flex items-center gap-3 pt-2">
++          <button id="submitBtn" type="submit" class="bg-fb-primary hover:bg-fb-primaryDark text-white px-4 py-2 rounded">ส่งคำขอ</button>
++          <span id="submitStatus" class="text-sm text-gray-600"></span>
++        </div>
++      </form>
++    </section>
++
++    <section id="tableSection" class="card p-4 md:p-6">
++      <h2 class="text-lg font-semibold mb-4">รายการคำขอที่ส่งล่าสุด</h2>
++      <table id="submissionsTable" class="display w-full text-sm"></table>
++    </section>
++  </main>
++
++  <footer class="text-center text-gray-600 py-6">
++    © 2025 Copyright | พัฒนาโดย ทีม ICT สำนักงานเขตพื้นที่การศึกษาประถมศึกษาชลบุรี เขต 2
++  </footer>
++
++  <script src="app.js"></script>
++</body>
++</html>
+EOF
+)
